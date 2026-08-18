@@ -44,6 +44,19 @@ function setupEventListeners() {
     // 图片上传
     imageUpload.addEventListener('change', handleImageUpload);
     
+    // 移除上传的图片按钮
+    const removeUploadBtn = document.getElementById('removeUpload');
+    if (removeUploadBtn) {
+        removeUploadBtn.addEventListener('click', removeUploadedImage);
+    }
+    
+    // 点击上传区域触发文件选择
+    uploadArea.addEventListener('click', (e) => {
+        if (e.target !== uploadPreview && e.target.id !== 'removeUpload') {
+            imageUpload.click();
+        }
+    });
+    
     // 拖拽上传
     uploadArea.addEventListener('dragover', handleDragOver);
     uploadArea.addEventListener('dragleave', handleDragLeave);
@@ -141,6 +154,8 @@ function checkTemplateHasNode(workflow, classType) {
 }
 
 // 图片上传处理
+let uploadedImageFile = null;
+
 function handleDragOver(e) {
     e.preventDefault();
     uploadArea.classList.add('drag-over');
@@ -175,13 +190,25 @@ function processImageFile(file) {
         return;
     }
     
+    uploadedImageFile = file;
     const reader = new FileReader();
     reader.onload = (e) => {
         uploadPreview.src = e.target.result;
         uploadPreview.style.display = 'block';
-        document.querySelector('.upload-placeholder').style.display = 'none';
+        document.querySelector('.upload-content').style.display = 'none';
+        document.getElementById('removeUpload').style.display = 'flex';
     };
     reader.readAsDataURL(file);
+}
+
+// 移除上传的图片
+function removeUploadedImage() {
+    uploadedImageFile = null;
+    imageUpload.value = '';
+    uploadPreview.src = '';
+    uploadPreview.style.display = 'none';
+    document.querySelector('.upload-content').style.display = 'block';
+    document.getElementById('removeUpload').style.display = 'none';
 }
 
 // 随机种子
@@ -271,7 +298,7 @@ function prepareWorkflowData() {
     };
     
     // 添加上传的图片（如果有）
-    if (uploadPreview.src && uploadPreview.style.display !== 'none') {
+    if (uploadedImageFile && uploadPreview.src && uploadPreview.style.display !== 'none') {
         data.image_data = uploadPreview.src;
     }
     
@@ -416,3 +443,4 @@ function showToast(message, type = 'info') {
 
 // 暴露给全局的函数（用于 HTML onclick）
 window.randomizeSeed = randomizeSeed;
+window.removeUploadedImage = removeUploadedImage;
