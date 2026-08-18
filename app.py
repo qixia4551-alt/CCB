@@ -254,6 +254,9 @@ def api_get_history(prompt_id):
                         'type': img.get('type', 'output')
                     })
     
+    else:
+        # 可能还在处理中
+        print(f"Prompt {prompt_id} not found in history yet")
     return jsonify({'images': images})
 
 @app.route('/api/image')
