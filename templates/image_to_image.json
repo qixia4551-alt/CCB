@@ -1,0 +1,69 @@
+{
+  "name": "Image to Image",
+  "description": "图生图工作流",
+  "workflow": {
+    "3": {
+      "class_type": "KSampler",
+      "inputs": {
+        "cfg": 8,
+        "denoise": 0.7,
+        "latent_image": ["12", 0],
+        "model": ["4", 0],
+        "negative": ["7", 0],
+        "positive": ["6", 0],
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "seed": 12345,
+        "steps": 20
+      }
+    },
+    "4": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "v1-5-pruned-emaonly.ckpt"
+      }
+    },
+    "6": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "clip": ["4", 1],
+        "text": "beautiful scenery nature glass bottle landscape, , purple galaxy bottle,"
+      }
+    },
+    "7": {
+      "class_type": "CLIPTextEncode",
+      "inputs": {
+        "clip": ["4", 1],
+        "text": "text, watermark"
+      }
+    },
+    "8": {
+      "class_type": "VAEDecode",
+      "inputs": {
+        "samples": ["3", 0],
+        "vae": ["4", 2]
+      }
+    },
+    "9": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "filename_prefix": "ComfyUI_img2img",
+        "images": ["8", 0]
+      }
+    },
+    "10": {
+      "class_type": "LoadImage",
+      "inputs": {
+        "image": "example.png",
+        "upload": "image"
+      }
+    },
+    "12": {
+      "class_type": "VAEEncode",
+      "inputs": {
+        "pixels": ["10", 0],
+        "vae": ["4", 2]
+      }
+    }
+  }
+}

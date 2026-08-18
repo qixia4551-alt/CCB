@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComfyUI 生图工具</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎨 ComfyUI 生图工具</h1>
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-indicator"></span>
+                <span class="status-text">检查连接中...</span>
+            </div>
+        </header>
+
+        <main>
+            <!-- 模板选择区域 -->
+            <section class="panel">
+                <h2>📁 工作流模板</h2>
+                <div class="template-selector">
+                    <select id="templateSelect">
+                        <option value="">-- 请选择模板 --</option>
+                    </select>
+                    <button id="refreshTemplates" class="btn btn-secondary" title="刷新模板列表">🔄</button>
+                </div>
+                <div id="templateDescription" class="template-description"></div>
+            </section>
+
+            <!-- 参数设置区域 -->
+            <section class="panel">
+                <h2>⚙️ 参数设置</h2>
+                <div class="params-grid">
+                    <div class="form-group full-width">
+                        <label for="prompt">正向提示词</label>
+                        <textarea id="prompt" rows="3" placeholder="输入正向提示词，例如：beautiful scenery, nature, glass bottle landscape"></textarea>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="negativePrompt">负向提示词</label>
+                        <textarea id="negativePrompt" rows="2" placeholder="输入负向提示词，例如：text, watermark, blurry"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="seed">种子 (Seed)</label>
+                        <input type="number" id="seed" value="-1" placeholder="-1 表示随机">
+                        <button class="btn btn-small" onclick="randomizeSeed()">🎲 随机</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="steps">采样步数 (Steps)</label>
+                        <input type="number" id="steps" value="20" min="1" max="150">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cfg">CFG Scale</label>
+                        <input type="number" id="cfg" value="8" min="1" max="20" step="0.5">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="width">宽度</label>
+                        <input type="number" id="width" value="512" min="64" max="2048" step="64">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="height">高度</label>
+                        <input type="number" id="height" value="512" min="64" max="2048" step="64">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="denoise">重绘幅度 (Denoise)</label>
+                        <input type="number" id="denoise" value="0.7" min="0" max="1" step="0.05">
+                    </div>
+                </div>
+
+                <!-- 图片上传区域 -->
+                <div class="form-group">
+                    <label>上传图片 (用于图生图/放大)</label>
+                    <div class="upload-area" id="uploadArea">
+                        <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                        <div class="upload-placeholder" onclick="document.getElementById('imageUpload').click()">
+                            <span class="upload-icon">📷</span>
+                            <span>点击或拖拽图片到此处</span>
+                            <span class="upload-hint">支持 PNG, JPG, WEBP 格式</span>
+                        </div>
+                        <img id="uploadPreview" class="upload-preview" style="display: none;">
+                    </div>
+                </div>
+            </section>
+
+            <!-- 生成控制区域 -->
+            <section class="panel">
+                <h2>🚀 生成控制</h2>
+                <div class="control-buttons">
+                    <button id="generateBtn" class="btn btn-primary btn-large">
+                        <span class="btn-icon">✨</span>
+                        开始生成
+                    </button>
+                    <button id="cancelBtn" class="btn btn-danger" disabled>
+                        取消
+                    </button>
+                </div>
+                <div id="progressInfo" class="progress-info" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <span class="progress-text">正在生成中...</span>
+                </div>
+            </section>
+
+            <!-- 结果展示区域 -->
+            <section class="panel">
+                <h2>🖼️ 生成结果</h2>
+                <div id="resultContainer" class="result-container">
+                    <div class="empty-state">
+                        <span class="empty-icon">🎭</span>
+                        <span>暂无生成结果，选择一个模板并开始生成吧！</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>ComfyUI Web Interface | 模板文件位于 <code>templates/</code> 文件夹</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
