@@ -309,37 +309,46 @@ function prepareWorkflowData() {
 function pollForResult(promptId, clientId) {
     let attempts = 0;
     const maxAttempts = 300; // 5 分钟超时
-    
+
+    console.log(`开始轮询结果，prompt_id: ${promptId}`);
+
     pollInterval = setInterval(async () => {
         attempts++;
-        
+
         if (attempts >= maxAttempts) {
             clearInterval(pollInterval);
             showToast('生成超时', 'error');
             resetGenerationState();
             return;
         }
-        
+
         try {
             const response = await fetch(`/api/history/${promptId}`);
             const data = await response.json();
-            
+
+            console.log(`轮询尝试 ${attempts}:`, data);
+
             if (data.error) {
-                // 可能还在处理中
+                // 可能还在处理中，继续轮询
                 return;
             }
-            
+
+            // 检查是否有 images 数组或者 history 中有输出
             if (data.images && data.images.length > 0) {
                 // 生成完成
                 clearInterval(pollInterval);
                 displayResults(data.images);
                 resetGenerationState();
+            } else if (Object.keys(data).length > 0 && !data.images) {
+                // 可能有数据但格式不同，检查是否包含 outputs
+                console.log('检测到历史数据但无 images 数组:', data);
             }
         } catch (error) {
             console.error('轮询失败:', error);
         }
     }, 1000); // 每秒轮询一次
 }
+
 
 // 显示结果
 function displayResults(images) {

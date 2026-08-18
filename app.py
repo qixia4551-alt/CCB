@@ -75,7 +75,11 @@ def queue_prompt(prompt, client_id):
             f'{COMFYUI_URL}/prompt',
             json={'prompt': prompt, 'client_id': client_id}
         )
-        return response.json()
+        result = response.json()
+        # ComfyUI 直接返回 {"prompt_id": "xxx"} 或包含错误信息
+        if response.status_code != 200:
+            return {'error': f'HTTP {response.status_code}: {result}'}
+        return result
     except Exception as e:
         return {'error': str(e)}
 
