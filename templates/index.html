@@ -3,129 +3,333 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ComfyUI 生图工具</title>
+    <title>ComfyUI Studio - AI 艺术创作平台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎨 ComfyUI 生图工具</h1>
-            <div class="connection-status" id="connectionStatus">
-                <span class="status-indicator"></span>
-                <span class="status-text">检查连接中...</span>
-            </div>
-        </header>
-
-        <main>
-            <!-- 模板选择区域 -->
-            <section class="panel">
-                <h2>📁 工作流模板</h2>
-                <div class="template-selector">
-                    <select id="templateSelect">
-                        <option value="">-- 请选择模板 --</option>
-                    </select>
-                    <button id="refreshTemplates" class="btn btn-secondary" title="刷新模板列表">🔄</button>
-                </div>
-                <div id="templateDescription" class="template-description"></div>
-            </section>
-
-            <!-- 参数设置区域 -->
-            <section class="panel">
-                <h2>⚙️ 参数设置</h2>
-                <div class="params-grid">
-                    <div class="form-group full-width">
-                        <label for="prompt">正向提示词</label>
-                        <textarea id="prompt" rows="3" placeholder="输入正向提示词，例如：beautiful scenery, nature, glass bottle landscape"></textarea>
-                    </div>
-                    
-                    <div class="form-group full-width">
-                        <label for="negativePrompt">负向提示词</label>
-                        <textarea id="negativePrompt" rows="2" placeholder="输入负向提示词，例如：text, watermark, blurry"></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="seed">种子 (Seed)</label>
-                        <input type="number" id="seed" value="-1" placeholder="-1 表示随机">
-                        <button class="btn btn-small" onclick="randomizeSeed()">🎲 随机</button>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="steps">采样步数 (Steps)</label>
-                        <input type="number" id="steps" value="20" min="1" max="150">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="cfg">CFG Scale</label>
-                        <input type="number" id="cfg" value="8" min="1" max="20" step="0.5">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="width">宽度</label>
-                        <input type="number" id="width" value="512" min="64" max="2048" step="64">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="height">高度</label>
-                        <input type="number" id="height" value="512" min="64" max="2048" step="64">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="denoise">重绘幅度 (Denoise)</label>
-                        <input type="number" id="denoise" value="0.7" min="0" max="1" step="0.05">
-                    </div>
-                </div>
-
-                <!-- 图片上传区域 -->
-                <div class="form-group">
-                    <label>上传图片 (用于图生图/放大)</label>
-                    <div class="upload-area" id="uploadArea">
-                        <input type="file" id="imageUpload" accept="image/*" style="display: none;">
-                        <div class="upload-placeholder" onclick="document.getElementById('imageUpload').click()">
-                            <span class="upload-icon">📷</span>
-                            <span>点击或拖拽图片到此处</span>
-                            <span class="upload-hint">支持 PNG, JPG, WEBP 格式</span>
-                        </div>
-                        <img id="uploadPreview" class="upload-preview" style="display: none;">
-                    </div>
-                </div>
-            </section>
-
-            <!-- 生成控制区域 -->
-            <section class="panel">
-                <h2>🚀 生成控制</h2>
-                <div class="control-buttons">
-                    <button id="generateBtn" class="btn btn-primary btn-large">
-                        <span class="btn-icon">✨</span>
-                        开始生成
-                    </button>
-                    <button id="cancelBtn" class="btn btn-danger" disabled>
-                        取消
-                    </button>
-                </div>
-                <div id="progressInfo" class="progress-info" style="display: none;">
-                    <div class="progress-bar">
-                        <div class="progress-fill"></div>
-                    </div>
-                    <span class="progress-text">正在生成中...</span>
-                </div>
-            </section>
-
-            <!-- 结果展示区域 -->
-            <section class="panel">
-                <h2>🖼️ 生成结果</h2>
-                <div id="resultContainer" class="result-container">
-                    <div class="empty-state">
-                        <span class="empty-icon">🎭</span>
-                        <span>暂无生成结果，选择一个模板并开始生成吧！</span>
-                    </div>
-                </div>
-            </section>
-        </main>
-
-        <footer>
-            <p>ComfyUI Web Interface | 模板文件位于 <code>templates/</code> 文件夹</p>
-        </footer>
+    <!-- 动态背景 -->
+    <div class="animated-bg">
+        <div class="gradient-orb gradient-orb-1"></div>
+        <div class="gradient-orb gradient-orb-2"></div>
+        <div class="gradient-orb gradient-orb-3"></div>
     </div>
+
+    <div class="app-container">
+        <!-- 侧边导航 -->
+        <aside class="sidebar">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h1>ComfyUI<br><span>Studio</span></h1>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-section="workflow">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+                        <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+                        <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+                        <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    <span>工作流</span>
+                </a>
+                <a href="#" class="nav-item" data-section="gallery">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+                        <path d="M21 15L16 10L5 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>作品库</span>
+                </a>
+            </nav>
+
+            <div class="connection-status" id="connectionStatus">
+                <div class="status-dot"></div>
+                <span class="status-label">连接中...</span>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="breadcrumb">
+                    <span class="breadcrumb-item">AI 艺术创作</span>
+                    <span class="breadcrumb-separator">/</span>
+                    <span class="breadcrumb-item current">智能生图</span>
+                </div>
+                <div class="user-actions">
+                    <button class="icon-btn" title="设置">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-wrapper">
+                <!-- 左侧面板：参数设置 -->
+                <div class="left-panel">
+                    <!-- 模板选择卡片 -->
+                    <div class="card glass-card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            <h2>工作流模板</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="template-selector-wrapper">
+                                <div class="custom-select">
+                                    <select id="templateSelect">
+                                        <option value="">-- 选择智能工作流 --</option>
+                                    </select>
+                                    <div class="select-arrow">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <button id="refreshTemplates" class="icon-btn-primary" title="刷新模板">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M23 4v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="templateDescription" class="template-description"></div>
+                        </div>
+                    </div>
+
+                    <!-- 提示词卡片 -->
+                    <div class="card glass-card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            <h2>提示词工程</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="prompt" class="form-label">
+                                    <span>正向提示词</span>
+                                    <span class="label-badge positive">Positive</span>
+                                </label>
+                                <textarea id="prompt" class="form-input form-textarea" rows="3" placeholder="描述您想要生成的画面，例如：a mystical forest with glowing mushrooms, ethereal lighting, fantasy art style..."></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="negativePrompt" class="form-label">
+                                    <span>负向提示词</span>
+                                    <span class="label-badge negative">Negative</span>
+                                </label>
+                                <textarea id="negativePrompt" class="form-input form-textarea" rows="2" placeholder="描述您不想要的元素，例如：blurry, low quality, watermark, text..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 参数调节卡片 -->
+                    <div class="card glass-card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            <h2>生成参数</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="params-grid">
+                                <div class="form-group">
+                                    <label for="seed" class="form-label">种子</label>
+                                    <div class="input-with-button">
+                                        <input type="number" id="seed" class="form-input" value="-1" placeholder="-1 随机">
+                                        <button class="btn-icon-small" onclick="randomizeSeed()" title="随机种子">
+                                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+                                                <circle cx="9" cy="9" r="1.5" fill="currentColor"/>
+                                                <circle cx="15" cy="9" r="1.5" fill="currentColor"/>
+                                                <circle cx="9" cy="15" r="1.5" fill="currentColor"/>
+                                                <circle cx="15" cy="15" r="1.5" fill="currentColor"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="steps" class="form-label">采样步数</label>
+                                    <input type="number" id="steps" class="form-input" value="20" min="1" max="150">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="cfg" class="form-label">CFG Scale</label>
+                                    <input type="number" id="cfg" class="form-input" value="8" min="1" max="20" step="0.5">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="width" class="form-label">宽度</label>
+                                    <input type="number" id="width" class="form-input" value="512" min="64" max="2048" step="64">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="height" class="form-label">高度</label>
+                                    <input type="number" id="height" class="form-input" value="512" min="64" max="2048" step="64">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="denoise" class="form-label">重绘幅度</label>
+                                    <input type="number" id="denoise" class="form-input" value="0.7" min="0" max="1" step="0.05">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 图片上传卡片 -->
+                    <div class="card glass-card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+                                    <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+                                    <path d="M21 15L16 10L5 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            <h2>参考图像</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="upload-area" id="uploadArea">
+                                <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                                <div class="upload-content">
+                                    <div class="upload-icon-wrapper">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            <polyline points="17,8 12,3 7,8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            <line x1="12" y1="3" x2="12" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                    </div>
+                                    <p class="upload-title">拖拽图片到此处或点击上传</p>
+                                    <p class="upload-hint">支持 PNG, JPG, WEBP 格式 • 最大 16MB</p>
+                                </div>
+                                <img id="uploadPreview" class="upload-preview" style="display: none;">
+                                <button class="upload-remove" id="removeUpload" style="display: none;">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧面板：生成与结果 -->
+                <div class="right-panel">
+                    <!-- 生成控制卡片 -->
+                    <div class="card glass-card highlight-card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            <h2>生成控制</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="generation-controls">
+                                <button id="generateBtn" class="btn-generate">
+                                    <span class="btn-glow"></span>
+                                    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    <span class="btn-text">开始生成</span>
+                                </button>
+                                <button id="cancelBtn" class="btn-cancel" disabled>
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                    <span>停止</span>
+                                </button>
+                            </div>
+                            <div id="progressInfo" class="progress-wrapper" style="display: none;">
+                                <div class="progress-header">
+                                    <span class="progress-label">正在渲染您的艺术作品</span>
+                                    <span class="progress-percent">0%</span>
+                                </div>
+                                <div class="progress-track">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill"></div>
+                                    </div>
+                                </div>
+                                <div class="progress-details">
+                                    <span class="detail-item">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                                            <polyline points="12,6 12,12 16,14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        </svg>
+                                        <span>处理中...</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 结果展示卡片 -->
+                    <div class="card glass-card results-card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+                                    <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+                                    <path d="M21 15L16 10L5 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            <h2>生成结果</h2>
+                            <div class="card-actions">
+                                <button class="icon-btn-sm" title="清空结果" id="clearResults">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="resultContainer" class="result-container">
+                                <div class="empty-state">
+                                    <div class="empty-illustration">
+                                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 4"/>
+                                            <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" opacity="0.5"/>
+                                            <path d="M21 15L16 10L5 21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+                                        </svg>
+                                    </div>
+                                    <h3>准备开始创作</h3>
+                                    <p>选择一个工作流模板，调整参数，然后点击生成按钮开始您的 AI 艺术之旅</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast 通知容器 -->
+    <div class="toast-container" id="toastContainer"></div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
