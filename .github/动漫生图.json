@@ -1,0 +1,119 @@
+{
+  "4": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "format": "png",
+      "format.bit_depth": "8-bit",
+      "format.input_color_space": "sRGB",
+      "images": [
+        "9:3",
+        0
+      ]
+    },
+    "class_type": "SaveImageAdvanced",
+    "_meta": {
+      "title": "保存图像（高级）"
+    }
+  },
+  "9:1": {
+    "inputs": {
+      "ckpt_name": "oneObsession_v24.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Checkpoint加载器（简易）"
+    }
+  },
+  "9:2": {
+    "inputs": {
+      "seed": 293844688102432,
+      "steps": 45,
+      "cfg": 6.0000000000000036,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "9:1",
+        0
+      ],
+      "positive": [
+        "9:5",
+        0
+      ],
+      "negative": [
+        "9:6",
+        0
+      ],
+      "latent_image": [
+        "9:8",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "K采样器"
+    }
+  },
+  "9:3": {
+    "inputs": {
+      "samples": [
+        "9:2",
+        0
+      ],
+      "vae": [
+        "9:7",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE解码"
+    }
+  },
+  "9:5": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "9:1",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "9:6": {
+    "inputs": {
+      "text": "worst quality,normal quality,anatomical nonsense,bad anatomy,interlocked fingers,extra fingers,watermark,simple background,transparent,low quality,logo,text,signature,face backlighting,backlighting,",
+      "clip": [
+        "9:1",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "9:7": {
+    "inputs": {
+      "vae_name": "sdxl_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "加载VAE"
+    }
+  },
+  "9:8": {
+    "inputs": {
+      "width": 768,
+      "height": 1344,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "空Latent图像"
+    }
+  }
+}
