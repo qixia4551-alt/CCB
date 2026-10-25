@@ -1,16 +1,215 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response
 import json
 import os
+import re
 import requests
+import subprocess
 import uuid
 import base64
 from datetime import datetime
+from pathlib import Path
+import threading
 import time
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['TEMPLATES_FOLDER'] = 'templates'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# 项目根目录与设置文件
+BASE_DIR = Path(__file__).resolve().parent
+SETTINGS_FILE = BASE_DIR / 'settings.json'
+_update_lock = threading.Lock()
+
+
+def load_settings():
+    """加载设置文件"""
+    settings = {
+        'auto_update': False,          # 是否开启定时自动拉取
+        'update_interval_minutes': 30, # 自动拉取间隔（分钟）
+        'github_repo_url': '',         # GitHub 仓库地址（可选，留空则使用当前 origin）
+        'github_branch': ''            # 分支（可选，留空则使用当前分支）
+    }
+    try:
+        if SETTINGS_FILE.exists():
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
+                settings.update(json.load(f))
+    except Exception as e:
+        print(f'Error loading settings: {e}')
+    return settings
+
+
+def save_settings(settings):
+    """保存设置文件"""
+    with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, ensure_ascii=False, indent=2)
+
+
+def run_git(args, timeout=120):
+    """在项目根目录执行 git 命令，返回 (returncode, stdout+stderr)"""
+    try:
+        result = subprocess.run(
+            ['git'] + args,
+            cwd=str(BASE_DIR),
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+        output = ((result.stdout or '') + (result.stderr or '')).strip()
+        return result.returncode, output
+    except FileNotFoundError:
+        return -1, '未找到 git 命令，请确认已安装 Git 并加入 PATH'
+    except subprocess.TimeoutExpired:
+        return -1, 'git 命令执行超时'
+    except Exception as e:
+        return -1, str(e)
+
+
+def normalize_repo_url(url):
+    """把 GitHub 页面/仓库地址规范化为可 clone/pull 的 URL"""
+    url = (url or '').strip().rstrip('/')
+    if not url:
+        return ''
+    m = re.match(r'^https?://github\.com/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$', url)
+    if m:
+        return f'https://github.com/{m.group(1)}/{m.group(2)}.git'
+    if url.startswith('git@github.com:'):
+        return url if url.endswith('.git') else url + '.git'
+    if url.startswith(('http://', 'https://', 'git@', 'ssh://')):
+        return url
+    return ''
+
+
+def get_current_remote_url():
+    code, out = run_git(['config', '--get', 'remote.origin.url'])
+    return out if code == 0 else ''
+
+
+def do_pull():
+    """执行一次 GitHub 仓库更新拉取，返回结果字典"""
+    settings = load_settings()
+    target_url = normalize_repo_url(settings.get('github_repo_url', '')) or get_current_remote_url()
+    if not target_url:
+        return {'success': False, 'message': '未配置 GitHub 仓库地址，且当前目录没有 origin 远程'}
+
+    branch = (settings.get('github_branch') or '').strip()
+
+    code, cur_branch_out = run_git(['rev-parse', '--abbrev-ref', 'HEAD'])
+    current_branch = cur_branch_out if code == 0 else ''
+    if not branch:
+        branch = current_branch if current_branch and current_branch != 'HEAD' else 'main'
+
+    rc, ls_out = run_git(['ls-remote', '--heads', target_url, branch], timeout=30)
+    if rc != 0:
+        return {'success': False, 'message': f'无法访问远程仓库：{ls_out}'}
+    if not ls_out.strip():
+        return {'success': False, 'message': f'远程仓库不存在分支 {branch}，请检查仓库地址和分支名'}
+
+    has_origin = run_git(['remote', 'get-url', 'origin'])[0] == 0
+    if has_origin:
+        run_git(['remote', 'set-url', 'origin', target_url])
+    else:
+        rc, out = run_git(['remote', 'add', 'origin', target_url])
+        if rc != 0:
+            return {'success': False, 'message': f'添加远程仓库失败：{out}'}
+
+    rc, out = run_git(['fetch', 'origin', branch])
+    if rc != 0:
+        return {'success': False, 'message': f'fetch 失败：{out}'}
+
+    rc, local_sha = run_git(['rev-parse', 'HEAD'])
+    rc2, remote_sha = run_git(['rev-parse', 'FETCH_HEAD'])
+    if rc == 0 and rc2 == 0 and local_sha == remote_sha:
+        return {'success': True, 'up_to_date': True,
+                'message': f'已是最新版本（{branch} @ {local_sha[:7]}），无需更新'}
+
+    # 本地有未提交的改动时先自动暂存，避免 pull 失败丢改动
+    dirty = run_git(['status', '--porcelain'])[1] != ''
+    if dirty:
+        rc, out = run_git(['stash', 'push', '-m', 'auto-update 自动暂存本地改动'])
+        if rc != 0:
+            return {'success': False, 'message': f'本地存在未提交改动且暂存失败：{out}'}
+
+    if current_branch == branch:
+        rc, out = run_git(['pull', '--ff-only', 'origin', branch])
+    else:
+        rc, out = run_git(['checkout', '-B', branch, 'FETCH_HEAD'])
+        if rc == 0:
+            rc, out = run_git(['pull', '--ff-only', 'origin', branch])
+
+    if rc != 0:
+        msg = f'拉取更新失败：{out}'
+        if dirty:
+            msg += '（本地改动已保存在 git stash 中，可执行 git stash pop 恢复）'
+        return {'success': False, 'message': msg}
+
+    new_rc, new_sha = run_git(['rev-parse', 'HEAD'])
+    updated_files = run_git(['diff', '--name-only', local_sha, 'HEAD'])[1] if rc == 0 and local_sha else ''
+    short_sha = new_sha[:7] if (new_rc == 0 and re.match(r'^[0-9a-f]{40}$', new_sha or '')) else ''
+    result = {
+        'success': True,
+        'up_to_date': False,
+        'message': f'更新成功！已拉取 {branch} 最新代码' + (f'（{short_sha}）' if short_sha else ''),
+        'updated_files': [f for f in updated_files.splitlines() if f],
+    }
+    if dirty:
+        result['message'] += '；本地未提交的改动已暂存到 git stash'
+
+    # 如果模板/工作流文件有变化，刷新模板缓存
+    global _templates_cache, _templates_cache_time
+    _templates_cache = None
+    _templates_cache_time = 0
+
+    return result
+
+
+def update_log(message):
+    """记录更新日志到 last_update.json"""
+    log = {}
+    log_file = BASE_DIR / 'last_update.json'
+    try:
+        if log_file.exists():
+            with open(log_file, 'r', encoding='utf-8') as f:
+                log = json.load(f)
+    except Exception:
+        log = {}
+    log.setdefault('history', [])
+    log['last_result'] = message
+    log.setdefault('history', []).append({
+        'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'result': message
+    })
+    log['history'] = log['history'][-20:]
+    try:
+        with open(log_file, 'w', encoding='utf-8') as f:
+            json.dump(log, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f'Error writing update log: {e}')
+
+
+def auto_update_worker():
+    """后台线程：按设置间隔自动拉取更新"""
+    while True:
+        settings = load_settings()
+        interval = max(int(settings.get('update_interval_minutes', 30) or 30), 1) * 60
+        time.sleep(interval)
+        try:
+            settings = load_settings()
+            if not settings.get('auto_update'):
+                continue
+            if not _update_lock.acquire(blocking=False):
+                continue
+            try:
+                result = do_pull()
+                update_log(result.get('message', ''))
+                print('[auto-update]', result.get('message', ''))
+            finally:
+                _update_lock.release()
+        except Exception as e:
+            print(f'[auto-update] error: {e}')
+
+
+threading.Thread(target=auto_update_worker, daemon=True).start()
 
 # ComfyUI API 地址
 COMFYUI_URL = os.environ.get('COMFYUI_URL', 'http://127.0.0.1:8188')
@@ -278,6 +477,73 @@ def api_check_connection():
         return jsonify({'connected': True, 'status': 'ok'})
     except Exception as e:
         return jsonify({'connected': False, 'error': str(e)})
+
+@app.route('/api/settings', methods=['GET'])
+def api_get_settings():
+    """获取设置"""
+    settings = load_settings()
+    settings['current_remote'] = get_current_remote_url()
+    code, branch = run_git(['rev-parse', '--abbrev-ref', 'HEAD'])
+    settings['current_branch'] = branch if code == 0 else ''
+    code, sha = run_git(['rev-parse', '--short', 'HEAD'])
+    settings['current_commit'] = sha if code == 0 else ''
+    return jsonify({'settings': settings})
+
+@app.route('/api/settings', methods=['POST'])
+def api_save_settings():
+    """保存设置"""
+    data = request.json or {}
+    settings = load_settings()
+
+    if 'auto_update' in data:
+        settings['auto_update'] = bool(data['auto_update'])
+    if 'update_interval_minutes' in data:
+        try:
+            interval = int(data['update_interval_minutes'])
+            settings['update_interval_minutes'] = min(max(interval, 1), 1440)
+        except (TypeError, ValueError):
+            return jsonify({'error': '更新间隔必须是整数分钟'}), 400
+    if 'github_repo_url' in data:
+        url = (data['github_repo_url'] or '').strip()
+        if url and not normalize_repo_url(url):
+            return jsonify({'error': 'GitHub 仓库地址格式不正确，请使用 https://github.com/用户/仓库 形式'}), 400
+        settings['github_repo_url'] = url
+    if 'github_branch' in data:
+        settings['github_branch'] = (data['github_branch'] or '').strip()
+
+    try:
+        save_settings(settings)
+    except Exception as e:
+        return jsonify({'error': f'保存设置失败：{e}'}), 500
+
+    return jsonify({'success': True, 'message': '设置已保存', 'settings': settings})
+
+@app.route('/api/update', methods=['POST'])
+def api_update():
+    """手动触发一次 GitHub 仓库更新拉取"""
+    if not _update_lock.acquire(blocking=False):
+        return jsonify({'success': False, 'message': '已有更新任务正在进行中，请稍候'}), 409
+    try:
+        result = do_pull()
+        update_log(result.get('message', ''))
+        status_code = 200 if result.get('success') else 500
+        return jsonify(result), status_code
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'更新失败：{e}'}), 500
+    finally:
+        _update_lock.release()
+
+@app.route('/api/update/log')
+def api_update_log():
+    """查看最近一次自动/手动更新结果"""
+    log_file = BASE_DIR / 'last_update.json'
+    try:
+        if log_file.exists():
+            with open(log_file, 'r', encoding='utf-8') as f:
+                return jsonify(json.load(f))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    return jsonify({'last_result': '', 'history': []})
 
 if __name__ == '__main__':
     # 确保必要目录存在

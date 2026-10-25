@@ -90,6 +90,39 @@
                 </div>
             </section>
 
+            <!-- 设置区域 -->
+            <section class="panel">
+                <h2>🧰 设置</h2>
+                <div class="settings-grid">
+                    <div class="form-group full-width">
+                        <label for="githubRepoUrl">GitHub 仓库地址（留空则使用当前 origin）</label>
+                        <input type="text" id="githubRepoUrl" placeholder="https://github.com/用户名/仓库名">
+                        <span class="settings-hint" id="currentRemoteHint"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="githubBranch">分支</label>
+                        <input type="text" id="githubBranch" placeholder="默认当前分支">
+                    </div>
+                    <div class="form-group">
+                        <label>定时自动更新</label>
+                        <label class="switch-label">
+                            <input type="checkbox" id="autoUpdateToggle">
+                            <span>开启后每隔下方间隔自动拉取 GitHub 更新</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="updateInterval">更新间隔（分钟）</label>
+                        <input type="number" id="updateInterval" value="30" min="1" max="1440">
+                    </div>
+                </div>
+                <div class="settings-actions">
+                    <button id="saveSettingsBtn" class="btn btn-secondary">💾 保存设置</button>
+                    <button id="checkUpdateBtn" class="btn btn-primary" title="立即从 GitHub 拉取最新代码">⬇️ 检查更新</button>
+                    <button id="forceUpdateBtn" class="btn btn-secondary" title="强制重新拉取一次">🔄 立即更新</button>
+                </div>
+                <div id="updateStatus" class="update-status" style="display: none;"></div>
+            </section>
+
             <!-- 生成控制区域 -->
             <section class="panel">
                 <h2>🚀 生成控制</h2>
