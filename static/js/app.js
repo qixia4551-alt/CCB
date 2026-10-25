@@ -27,12 +27,24 @@ const progressInfo = document.getElementById('progressInfo');
 const resultContainer = document.getElementById('resultContainer');
 const connectionStatus = document.getElementById('connectionStatus');
 
+// 设置面板元素
+const githubRepoUrlInput = document.getElementById('githubRepoUrl');
+const githubBranchInput = document.getElementById('githubBranch');
+const autoUpdateToggle = document.getElementById('autoUpdateToggle');
+const updateIntervalInput = document.getElementById('updateInterval');
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+const checkUpdateBtn = document.getElementById('checkUpdateBtn');
+const forceUpdateBtn = document.getElementById('forceUpdateBtn');
+const updateStatus = document.getElementById('updateStatus');
+const currentRemoteHint = document.getElementById('currentRemoteHint');
+
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
     loadTemplates();
     checkConnection();
     setupEventListeners();
     randomizeSeed();
+    loadSettings();
 });
 
 // 设置事件监听器
@@ -52,6 +64,11 @@ function setupEventListeners() {
     // 生成按钮
     generateBtn.addEventListener('click', startGeneration);
     cancelBtn.addEventListener('click', cancelGeneration);
+
+    // 设置 / 自动更新
+    if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', saveSettings);
+    if (checkUpdateBtn) checkUpdateBtn.addEventListener('click', () => triggerUpdate(false));
+    if (forceUpdateBtn) forceUpdateBtn.addEventListener('click', () => triggerUpdate(true));
 }
 
 // 加载模板列表
@@ -382,6 +399,114 @@ function resetGenerationState() {
     generateBtn.disabled = false;
     cancelBtn.disabled = true;
     progressInfo.style.display = 'none';
+}
+
+// ==================== 设置 / GitHub 自动更新 ====================
+
+// 加载设置
+async function loadSettings() {
+    if (!githubRepoUrlInput) return;
+    try {
+        const response = await fetch('/api/settings');
+        const data = await response.json();
+        const s = data.settings || {};
+        githubRepoUrlInput.value = s.github_repo_url || '';
+        githubBranchInput.value = s.github_branch || '';
+        autoUpdateToggle.checked = !!s.auto_update;
+        updateIntervalInput.value = s.update_interval_minutes || 30;
+
+        let hintText = '';
+        if (s.current_remote) {
+            hintText += `当前 origin：${s.current_remote}`;
+        } else {
+            hintText += '当前目录没有配置 origin 远程';
+        }
+        if (s.current_branch) {
+            hintText += ` ｜ 当前分支：${s.current_branch} @ ${s.current_commit || ''}`;
+        }
+        currentRemoteHint.textContent = hintText;
+    } catch (error) {
+        console.error('加载设置失败:', error);
+    }
+}
+
+// 保存设置
+async function saveSettings() {
+    const payload = {
+        github_repo_url: githubRepoUrlInput.value.trim(),
+        github_branch: githubBranchInput.value.trim(),
+        auto_update: autoUpdateToggle.checked,
+        update_interval_minutes: parseInt(updateIntervalInput.value) || 30
+    };
+    try {
+        const response = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok || result.error) {
+            throw new Error(result.error || '保存失败');
+        }
+        showToast('设置已保存' + (result.settings.auto_update ? `，将每 ${result.settings.update_interval_minutes} 分钟自动检查更新` : ''), 'success');
+        loadSettings();
+    } catch (error) {
+        showToast('保存设置失败：' + error.message, 'error');
+    }
+}
+
+// 显示更新状态
+function showUpdateStatus(html, type) {
+    updateStatus.style.display = 'block';
+    updateStatus.className = `update-status ${type}`;
+    updateStatus.innerHTML = html;
+}
+
+// 触发一次更新拉取（force=true 时即使已是最新也重新走一遍流程）
+async function triggerUpdate(force) {
+    checkUpdateBtn.disabled = true;
+    forceUpdateBtn.disabled = true;
+    checkUpdateBtn.textContent = '⏳ 正在拉取更新...';
+    showUpdateStatus('<span>正在从 GitHub 拉取最新代码，请稍候...</span>', 'pending');
+
+    try {
+        // 先保存当前表单中的仓库地址/分支，确保后端用的是最新配置
+        await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                github_repo_url: githubRepoUrlInput.value.trim(),
+                github_branch: githubBranchInput.value.trim()
+            })
+        });
+
+        const response = await fetch('/api/update', { method: 'POST' });
+        const result = await response.json();
+
+        if (result.success) {
+            let html = `<span class="update-ok">✅ ${result.message}</span>`;
+            if (result.updated_files && result.updated_files.length > 0) {
+                html += '<div class="updated-files"><strong>更新的文件：</strong><ul>' +
+                    result.updated_files.map(f => `<li><code>${f}</code></li>`).join('') +
+                    '</ul></div>';
+            }
+            showUpdateStatus(html, 'ok');
+            showToast(result.message, 'success');
+            // 更新后刷新模板列表和设置显示
+            loadTemplates();
+            loadSettings();
+        } else {
+            showUpdateStatus(`<span class="update-error">❌ ${result.message}</span>`, 'error');
+            showToast('更新失败：' + result.message, 'error');
+        }
+    } catch (error) {
+        showUpdateStatus(`<span class="update-error">❌ 请求失败：${error.message}</span>`, 'error');
+        showToast('更新请求失败：' + error.message, 'error');
+    } finally {
+        checkUpdateBtn.disabled = false;
+        forceUpdateBtn.disabled = false;
+        checkUpdateBtn.textContent = '⬇️ 检查更新';
+    }
 }
 
 // Toast 通知
